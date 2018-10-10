@@ -1,3 +1,3 @@
 標準モジュールとしてOutlookVBE内にインストールする
 
-返信対象のメールを選択した状態で、ReplyAsHTMLを実行する
+返信対象のメールを選択した状態で、`ReplyAsHTML`もしくは`ReplyAsPlainText`を実行する
