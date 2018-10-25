@@ -42,8 +42,6 @@ Sub ReplyAsPlainText()
             
         Next crlfOneLine
         
-        Body
-        
         'ˆø—p"> "‚ğ•t‰Á‚µ‚½collection‚ğì‚é
         For Each oneLine In lineColctn
             
