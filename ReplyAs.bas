@@ -1,5 +1,8 @@
 Attribute VB_Name = "ReplyAs"
-Dim oMsgReply As Outlook.MailItem
+
+' <Globals>---------------------------------------------
+Dim obj_replyingMailItem As Outlook.MailItem
+' --------------------------------------------</Globals>
 
 '
 'HTML形式で返信メールを作成する
@@ -18,14 +21,15 @@ Sub ReplyAsPlainText()
     Dim lineColctn As New Collection
     Dim quotedLineColctn As New Collection
     Dim replyBody As String
+    Dim qut As String: qut = "> "
     
     MakeHtmlReply
     
-    If Not (oMsgReply Is Nothing) Then '返信メール作成成功の場合
+    If Not (obj_replyingMailItem Is Nothing) Then '返信メール作成成功の場合
         
         
         '1行毎に分解したcollectionを作る
-        crlfSplitted = Split(oMsgReply.Body, vbCrLf)
+        crlfSplitted = Split(obj_replyingMailItem.Body, vbCrLf)
         For Each crlfOneLine In crlfSplitted
         
             crSplitted = Split(crlfOneLine, vbCr)
@@ -45,20 +49,22 @@ Sub ReplyAsPlainText()
         '引用"> "を付加したcollectionを作る
         For Each oneLine In lineColctn
             
-            quotedLineColctn.Add Item:="> " & oneLine
+            quotedLineColctn.Add Item:=qut & oneLine
             
         Next
         
         '本文を作る
         replyBody = String(3, vbCrLf) '先頭に空行を挿入する
+        replyBody = replyBody & qut & "-----Original Message-----"
+        
         For Each oneLine In quotedLineColctn
             
             replyBody = replyBody & vbCrLf & oneLine
             
         Next
         
-        oMsgReply.BodyFormat = olFormatPlain 'メールオブジェクトをプレーンテキスト形式に変更する
-        oMsgReply.Body = replyBody '本文
+        obj_replyingMailItem.BodyFormat = olFormatPlain 'メールオブジェクトをプレーンテキスト形式に変更する
+        obj_replyingMailItem.Body = replyBody '本文
         
     End If
     
@@ -70,62 +76,123 @@ End Sub
 '
 Private Sub MakeHtmlReply()
 
-    Dim oSelection As Outlook.Selection
-    Dim oItem As Object
+    'エラーダイアログ用タイトル
+    Const str_dialogTitle As String = "Reply in HTML"
     
-    Set oMsgReply = Nothing
+    'エラーダイアログで、オブジェクトクラス一覧の説明URLを表示する場合以下を使う
+    Const str_objClassEnumsUrl As String = "https://docs.microsoft.com/ja-jp/office/vba/api/outlook.olobjectclass"
 
-    'Get the selected item
+    Dim obj_activeItem As Object '表示中アイテム
+    
+    'Initialize
+    Set obj_replyingMailItem = Nothing
+
+    '<選択状態チェック>--------------------------------------------------------------------------
+    
+    '画面状態に応じたアイテム取得
     Select Case TypeName(Application.ActiveWindow)
-        Case "Explorer"
+        
+        Case "Explorer" 'Outlook メイン画面(リスト一覧, 閲覧ウィンドウ画面)の場合
+        
             Set oSelection = Application.ActiveExplorer.Selection
             
-            If oSelection.Count > 0 Then
-                Set oItem = oSelection.Item(1)
-            Else
-                MsgBox "Please select an item first!", vbCritical, "Reply in HTML"
-                Exit Sub
+            If (oSelection.Count = 0) Then ' アイテムが選択されていない場合
+                
+                MsgBox "Please select an item first!", _
+                       vbCritical, _
+                       str_dialogTitle
+                
+                Exit Sub ' 終了
+            
+            ElseIf (1 < oSelection.Count) Then ' アイテムが複数選択されている場合
+                
+                MsgBox "Only one item can be replyed", _
+                       vbCritical, _
+                       str_dialogTitle
+                
+                Exit Sub ' 終了
+                
+            Else 'アイテム選択は 1 のみの場合
+                Set obj_activeItem = oSelection.Item(1) '選択アイテムを記録
+            
             End If
             
-        Case "Inspector"
-            Set oItem = Application.ActiveInspector.CurrentItem
+        Case "Inspector" '単体表示(アイテムをダブルクリックして開いた画面)の場合
         
-        Case Else
-            MsgBox "Unsupported Window type." & vbNewLine & "Please select or open an item first.", _
+            Set obj_activeItem = Application.ActiveInspector.CurrentItem '選択アイテムを記録
+        
+        Case Else 'Unkown な場合
+        
+            MsgBox "Unsupported Window type.", _
                    vbCritical, _
-                   "Reply in HTML"
+                   str_dialogTitle
                    
-            Exit Sub
+            Exit Sub ' 終了
             
     End Select
-        
-    Dim oMsg As Outlook.MailItem
     
-    'Change the message format and reply
-    If oItem.Class = olMail Then
+    '-------------------------------------------------------------------------</選択状態チェック>
         
-        Set oMsg = oItem
+    '返信メッセージの作成
+    If (obj_activeItem.Class = olMail) Then ' MailItem の場合
         
-        oMsg.BodyFormat = olFormatHTML '返信元メールをHTML形式に変換する
+        obj_activeItem.BodyFormat = olFormatHTML '返信元メールをHTML形式に変換する
+        Set obj_replyingMailItem = obj_activeItem.ReplyAll '全員返信のメールアイテムを作成
+        obj_activeItem.Close (olDiscard) '返信元メールに対するHTML形式変換操作を破棄
         
-        'Set oMsgReply = oMsg.Reply '送信者に返信
-        Set oMsgReply = oMsg.ReplyAll '全員に返信
-
-        oMsg.Close (olDiscard)
-        oMsgReply.Display
+        obj_replyingMailItem.Display '返信メールを表示
         
-    Else 'Selected item isn't a mail item
-        MsgBox "No message item selected. Please select a message first.", _
-               vbCritical, _
-               "Reply in HTML"
+    ElseIf (obj_activeItem.Class = olAppointment) Then '予定アイテムの場合
+        
+        Application.ActiveExplorer.CommandBars.ExecuteMso ("ReplyAll") 'ウィンドウ機能の `全員に返信` を実行
+        Set obj_replyingMailItem = Application.ActiveInspector.CurrentItem '開かれた新規ウィンドウを返信 MailItem とする
+        
+    Else 'Unkown アイテムの場合
+    
+        int_retOfDialog = MsgBox( _
+            "Unsupported item type `" & obj_activeItem.Class & "`." & vbCrLf & _
+            "To check meaning of this enumeration value, please visit following URL." & vbCrLf & _
+            "(select `OK` to copy URL)" & vbCrLf & _
+            "" & vbCrLf & _
+            str_objClassEnumsUrl, _
+            vbCritical + vbOKCancel, _
+            str_dialogTitle _
+        )
+        
+        If (int_retOfDialog = vbOK) Then ' `OK` が選択された場合
+            SetCB str_objClassEnumsUrl 'URL をクリップボードにコピー
+        
+        End If
                
-        Exit Sub
+        Exit Sub '終了
         
     End If
 
-    'Cleanup
-    Set oMsg = Nothing
-    Set oItem = Nothing
-    Set oSelection = Nothing
 
 End Sub
+
+
+'<クリップボード操作>-------------------------------------------
+
+'クリップボードに文字列を格納
+Private Sub SetCB(ByVal str As String)
+  With CreateObject("Forms.TextBox.1")
+    .MultiLine = True
+    .Text = str
+    .SelStart = 0
+    .SelLength = .TextLength
+    .Copy
+  End With
+End Sub
+
+'クリップボードから文字列を取得
+Private Sub GetCB(ByRef str As String)
+  With CreateObject("Forms.TextBox.1")
+    .MultiLine = True
+    If .CanPaste = True Then .Paste
+    str = .Text
+  End With
+End Sub
+
+'------------------------------------------</クリップボード操作>
+ 
