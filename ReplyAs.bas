@@ -1,5 +1,4 @@
 Attribute VB_Name = "ReplyAs"
-
 ' <Globals>---------------------------------------------
 Dim obj_replyingMailItem As Outlook.MailItem
 ' --------------------------------------------</Globals>
@@ -143,8 +142,31 @@ Private Sub MakeHtmlReply()
         obj_replyingMailItem.Display '返信メールを表示
         
     ElseIf (obj_activeItem.Class = olAppointment) Then '予定アイテムの場合
+    
+        '会議出席依頼形式の予定に変換された copy item を作成する
+        Set obj_tmpItem = obj_activeItem.Copy ' copy item を作成
+        obj_tmpItem.MeetingStatus = olMeeting '会議形式に変換
+        obj_tmpItem.Save
+        obj_tmpItem.Display '保存した copy item を単体表示(アイテムをダブルクリックして開いた状態)にする
         
-        Application.ActiveExplorer.CommandBars.ExecuteMso ("ReplyAll") 'ウィンドウ機能の `全員に返信` を実行
+        Application.ActiveInspector.CommandBars.ExecuteMso ("ReplyAll") 'ウィンドウ機能の `全員に返信` を実行
+        Set obj_replyingMailItem = Application.ActiveInspector.CurrentItem '開かれた新規ウィンドウを返信 MailItem とする
+        
+        obj_tmpItem.Close (olDiscard) 'copy item に対する会議形式変換操作を破棄
+        obj_tmpItem.Delete 'copy item を削除
+        
+    ElseIf (obj_activeItem.Class = olMeetingRequest) Then '会議出席依頼の場合
+        
+        If (TypeName(Application.ActiveWindow) = "Explorer") Then 'Outlook メイン画面(リスト一覧, 閲覧ウィンドウ画面)の場合
+        
+            Application.ActiveExplorer.CommandBars.ExecuteMso ("ReplyAll") 'ウィンドウ機能の `全員に返信` を実行
+            
+        Else ' `Inspector` 状態 (= 単体表示(アイテムをダブルクリックして開いた画面))の場合
+        
+            Application.ActiveInspector.CommandBars.ExecuteMso ("ReplyAll") 'ウィンドウ機能の `全員に返信` を実行
+        
+        End If
+        
         Set obj_replyingMailItem = Application.ActiveInspector.CurrentItem '開かれた新規ウィンドウを返信 MailItem とする
         
     Else 'Unkown アイテムの場合
@@ -195,4 +217,4 @@ Private Sub GetCB(ByRef str As String)
 End Sub
 
 '------------------------------------------</クリップボード操作>
- 
+
