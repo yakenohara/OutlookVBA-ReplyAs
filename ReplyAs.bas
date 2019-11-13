@@ -155,7 +155,12 @@ Private Sub MakeHtmlReply()
         obj_tmpItem.Close (olDiscard) 'copy item に対する会議形式変換操作を破棄
         obj_tmpItem.Delete 'copy item を削除
         
-    ElseIf (obj_activeItem.Class = olMeetingRequest) Then '会議出席依頼の場合
+    ElseIf _
+        (obj_activeItem.Class = olMeetingRequest) Or _
+        (obj_activeItem.Class = olMeetingResponseNegative) Or _
+        (obj_activeItem.Class = olMeetingResponsePositive) Or _
+        (obj_activeItem.Class = olMeetingResponseTentative) _
+    Then '会議出席依頼・返信の場合
         
         If (TypeName(Application.ActiveWindow) = "Explorer") Then 'Outlook メイン画面(リスト一覧, 閲覧ウィンドウ画面)の場合
         
