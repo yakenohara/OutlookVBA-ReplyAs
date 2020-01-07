@@ -143,17 +143,35 @@ Private Sub MakeHtmlReply()
         
     ElseIf (obj_activeItem.Class = olAppointment) Then '予定アイテムの場合
     
-        '会議出席依頼形式の予定に変換された copy item を作成する
-        Set obj_tmpItem = obj_activeItem.Copy ' copy item を作成
+        'note
+        '
+        ' 以下の方法は copy item を削除できないことがあるので、やらない
+        ' (原因不明。エラー発生しないので調べようがない)
+        '
+        ' 1. copy item を作成
+        ' 2. 会議形式に変換
+        ' 3. `ExecuteMso ("ReplyAll")`
+        ' 4. copy item を削除 <- 削除できないことがある
+        '
+        
+        Set obj_tmpItem = obj_activeItem
+        
+        'note
+        ' `MeetingStatus` を 会議形式に変換した後に `.Close (olDiscard)` しても、`MeetingStatus` が元に戻らないので、
+        ' 変換前の `MeetingStatus` を保存しておき、終了時にもとにも戻して `.Save` する
+        '
+        
+        int_beforeMeetingStatus = obj_tmpItem.MeetingStatus 'MeetingStatus を保存
+        
         obj_tmpItem.MeetingStatus = olMeeting '会議形式に変換
-        obj_tmpItem.Save
         obj_tmpItem.Display '保存した copy item を単体表示(アイテムをダブルクリックして開いた状態)にする
         
         Application.ActiveInspector.CommandBars.ExecuteMso ("ReplyAll") 'ウィンドウ機能の `全員に返信` を実行
         Set obj_replyingMailItem = Application.ActiveInspector.CurrentItem '開かれた新規ウィンドウを返信 MailItem とする
         
-        obj_tmpItem.Close (olDiscard) 'copy item に対する会議形式変換操作を破棄
-        obj_tmpItem.Delete 'copy item を削除
+        obj_tmpItem.MeetingStatus = int_beforeMeetingStatus '保存しておいた MeetingStatus に戻す
+        
+        obj_tmpItem.Close (olSave) '保存してアイテムを閉じる
         
     ElseIf _
         (obj_activeItem.Class = olMeetingRequest) Or _
